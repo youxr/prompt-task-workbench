@@ -46,4 +46,20 @@ describe("analyzePrompt", () => {
     expect(result.contextOptimizations.some((item) => item.name === "目标前后锚定")).toBe(true);
     expect(result.estimatedImprovements.find((item) => item.metric === "上下文噪声控制")?.improvement).toBe(35);
   });
+
+  it("expands vague creative build prompts into a concrete production plan", () => {
+    const result = analyzePrompt("我想做个小汽车");
+
+    expect(result.tasks).toHaveLength(6);
+    expect(result.tasks.map((task) => task.title)).toEqual([
+      "明确作品形态与目标体验",
+      "拆解核心组成元素",
+      "设计最小可行版本",
+      "补充表现力与交互细节",
+      "生成制作提示词或实现计划",
+      "验收与迭代建议"
+    ]);
+    expect(result.tasks[1].description).toContain("小汽车");
+    expect(result.optimizedPrompt).toContain("可视化原型或交互小作品");
+  });
 });

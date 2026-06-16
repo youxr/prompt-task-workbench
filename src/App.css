@@ -80,6 +80,50 @@ h1 {
   margin-top: 24px;
 }
 
+.product-upgrade-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.product-upgrade-strip article {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #cfe0d7;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(11, 127, 103, 0.08), rgba(255, 255, 255, 0.92)),
+    #ffffff;
+}
+
+.product-upgrade-strip span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 12px;
+  color: #ffffff;
+  border-radius: 999px;
+  background: #0b7f67;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.product-upgrade-strip strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #17211c;
+  font-size: 1rem;
+}
+
+.product-upgrade-strip p {
+  margin-bottom: 0;
+  color: #56675d;
+  line-height: 1.55;
+}
+
 .account-section {
   display: grid;
   grid-template-columns: minmax(340px, 0.85fr) minmax(460px, 1.15fr);
@@ -1095,6 +1139,7 @@ pre {
 @media (max-width: 1100px) {
   .hero-band,
   .account-section,
+  .product-upgrade-strip,
   .workspace-grid,
   .result-grid,
   .benchmark-grid,
@@ -1125,6 +1170,7 @@ pre {
 
   .hero-metrics,
   .admin-stats,
+  .product-upgrade-strip,
   .controls,
   .task-list,
   .sample-grid,

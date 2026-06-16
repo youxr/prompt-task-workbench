@@ -22,6 +22,24 @@ const RISK_TERMS = ["上线", "支付", "订单", "安全", "隐私", "合规", 
 
 const OUTPUT_TERMS = ["输出", "交付", "页面", "文案", "报告", "代码", "邮件", "网站", "系统", "方案"];
 
+const CREATIVE_OBJECT_TERMS = [
+  "小汽车",
+  "汽车",
+  "车",
+  "机器人",
+  "飞机",
+  "房子",
+  "玩具",
+  "模型",
+  "小游戏",
+  "动画",
+  "海报",
+  "logo",
+  "Logo",
+  "图标",
+  "角色"
+];
+
 export function analyzePrompt(
   prompt: string,
   rawOptions: Partial<PromptAnalysisOptions> = {}
@@ -114,6 +132,10 @@ function createTaskDrafts(
     return createProjectTasks(prompt, goal, options);
   }
 
+  if (isCreativeBuildPrompt(prompt)) {
+    return createCreativeBuildTasks(prompt, goal, options);
+  }
+
   const sequenceTasks = extractExplicitSequenceTasks(prompt);
   if (sequenceTasks.length >= 2) {
     return withSequentialDependencies(sequenceTasks);
@@ -170,6 +192,91 @@ function isProjectPrompt(prompt: string): boolean {
 
 function isRiskLaunchPrompt(prompt: string): boolean {
   return /支付|上线|回滚|失败重试|安全|订单状态/.test(prompt) && /方案|规划|检查|测试/.test(prompt);
+}
+
+function isCreativeBuildPrompt(prompt: string): boolean {
+  if (/购物车|车站|车辆管理|车险|车贷/.test(prompt)) {
+    return false;
+  }
+
+  const hasObject = CREATIVE_OBJECT_TERMS.some((term) => prompt.includes(term));
+  const hasBuildIntent = /想做|做个|做一个|生成|画|设计|制作|实现|开发|创建|帮我做|我要做/.test(prompt);
+  return hasObject && (hasBuildIntent || prompt.length <= 18);
+}
+
+function createCreativeBuildTasks(
+  prompt: string,
+  goal: string,
+  options: PromptAnalysisOptions
+): TaskDraft[] {
+  const objectName = extractCreativeObject(prompt) || goal;
+  const medium = inferCreativeMedium(prompt);
+  const tasks: TaskDraft[] = [
+    {
+      title: "明确作品形态与目标体验",
+      description: `把“${objectName}”从一句模糊想法落成具体作品：${medium}，并定义目标用户、使用场景和最终观感。`,
+      dependsOn: [],
+      rationale: "创意类短提示词最大的问题是目标形态不清，必须先把作品类型和体验目标定下来。",
+      contextHints: ["作品类型", "目标用户", "使用场景", "完成形态"]
+    },
+    {
+      title: "拆解核心组成元素",
+      description: `列出${objectName}必须具备的结构、外观、交互和内容元素，例如主体、颜色、比例、状态和细节。`,
+      dependsOn: ["T1"],
+      rationale: "先拆元素可以避免生成结果只有一个空泛概念，没有可检查细节。",
+      contextHints: ["主体结构", "颜色风格", "关键细节", "可选装饰"]
+    },
+    {
+      title: "设计最小可行版本",
+      description: `给出${objectName}的 MVP 方案，优先完成一眼能看懂、能演示、能迭代的版本。`,
+      dependsOn: ["T2"],
+      rationale: "MVP 能让模糊创意快速变成可交付成果，避免一开始追求过大范围。",
+      contextHints: ["最小功能", "第一屏效果", "可演示路径", "暂不包含"]
+    },
+    {
+      title: "补充表现力与交互细节",
+      description: `为${objectName}补充视觉层次、动态反馈、用户操作和边界状态，让作品不只是“有”，而是“像”。`,
+      dependsOn: ["T3"],
+      rationale: "创意作品的质量差异通常来自细节和反馈，不应只停留在功能清单。",
+      contextHints: ["视觉层次", "动画反馈", "交互状态", "异常/边界"]
+    },
+    {
+      title: "生成制作提示词或实现计划",
+      description: `输出可直接交给 AI 或开发者执行的制作指令，包含目标、元素、步骤、风格、验收标准。`,
+      dependsOn: ["T4"],
+      rationale: "最终产物要能被下一步直接执行，而不是只给概念描述。",
+      contextHints: ["制作步骤", "提示词", "代码/素材要求", "验收标准"]
+    },
+    {
+      title: "验收与迭代建议",
+      description: `检查${objectName}是否满足目标体验，并给出 3 个可选升级方向。`,
+      dependsOn: ["T5"],
+      rationale: "创意项目需要明确“什么算好”和“下一版怎么变好”。",
+      contextHints: ["验收清单", "可玩性/可视性", "升级方向", "用户反馈"]
+    }
+  ];
+
+  return options.granularity === "compact" ? tasks.slice(0, 5) : tasks;
+}
+
+function extractCreativeObject(prompt: string): string {
+  return CREATIVE_OBJECT_TERMS.find((term) => prompt.includes(term)) || "";
+}
+
+function inferCreativeMedium(prompt: string): string {
+  if (/网页|页面|网站|前端|HTML|CSS|React|小游戏|交互/.test(prompt)) {
+    return "交互式网页作品";
+  }
+
+  if (/画|图片|海报|logo|图标|视觉/.test(prompt)) {
+    return "视觉设计稿";
+  }
+
+  if (/3D|模型|建模|立体/.test(prompt)) {
+    return "三维或模型作品";
+  }
+
+  return "可视化原型或交互小作品";
 }
 
 function createRiskLaunchTasks(prompt: string, goal: string): TaskDraft[] {
@@ -480,6 +587,20 @@ function inferMissingInformation(prompt: string, goal: string): string[] {
     missing.push("技术栈、数据来源和部署约束");
   }
 
+  if (isCreativeBuildPrompt(prompt)) {
+    if (!/网页|页面|图片|3D|模型|实物|动画|小游戏|React|HTML|画/.test(prompt)) {
+      missing.push("作品形态：网页、图片、动画、3D 模型还是实物方案");
+    }
+
+    if (!/风格|颜色|可爱|科技|卡通|写实|复古|极简/.test(prompt)) {
+      missing.push("视觉风格和颜色偏好");
+    }
+
+    if (!/孩子|用户|展示|课程|比赛|作业|商用|个人/.test(prompt)) {
+      missing.push("用途、受众和验收场景");
+    }
+  }
+
   return missing;
 }
 
@@ -496,6 +617,10 @@ function inferAssumptions(prompt: string, goal: string, missingInformation: stri
 
   if (/网站|系统|应用|平台|项目/.test(goal)) {
     assumptions.push("项目型任务默认先做需求和数据结构，再做页面实现和测试。");
+  }
+
+  if (isCreativeBuildPrompt(prompt)) {
+    assumptions.push("创意短提示默认按“可视化原型或交互小作品”推进，先做 MVP，再补表现力和验收标准。");
   }
 
   if (!/不要|禁止|不能/.test(prompt)) {
@@ -680,6 +805,11 @@ export function getSamplePrompts(): Array<{ title: string; prompt: string; expec
       title: "显式顺序：竞品到文案",
       prompt: "先分析竞品，再设计功能，然后写推广文案",
       expectation: "应保留竞品分析、功能设计、推广文案的因果顺序。"
+    },
+    {
+      title: "模糊创意：小汽车",
+      prompt: "我想做个小汽车",
+      expectation: "应主动补全作品形态、核心元素、MVP、表现力、制作计划和验收标准。"
     },
     {
       title: "长提示词：背景与多目标",

@@ -466,6 +466,24 @@ function App() {
 
       {currentUser ? (
         <>
+      <section className="product-upgrade-strip">
+        <article>
+          <span>01</span>
+          <strong>从一句想法到作品 brief</strong>
+          <p>短提示会自动补齐作品形态、受众、风格、MVP 和验收标准。</p>
+        </article>
+        <article>
+          <span>02</span>
+          <strong>从任务清单到执行图</strong>
+          <p>每个元任务都有顺序、依赖、重要度、质量门和角色交接规则。</p>
+        </article>
+        <article>
+          <span>03</span>
+          <strong>从 prompt 到可执行合约</strong>
+          <p>最终生成能直接交给 AI 执行的阶段化协议，避免只得到泛泛建议。</p>
+        </article>
+      </section>
+
       <section className="workspace-grid">
         <div className="input-panel">
           <div className="panel-heading">
