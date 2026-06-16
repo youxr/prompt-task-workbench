@@ -62,4 +62,42 @@ describe("analyzePrompt", () => {
     expect(result.tasks[1].description).toContain("小汽车");
     expect(result.optimizedPrompt).toContain("可视化原型或交互小作品");
   });
+
+  it("routes diverse short prompts through domain-specific task plans", () => {
+    const cases = [
+      {
+        prompt: "帮我准备考研复习计划",
+        expectedTitle: "拆分阶段学习路径"
+      },
+      {
+        prompt: "分析销售数据做报告",
+        expectedTitle: "检查数据结构与质量"
+      },
+      {
+        prompt: "写一个短视频脚本",
+        expectedTitle: "搭建内容结构与卖点"
+      },
+      {
+        prompt: "我要做一个减肥计划",
+        expectedTitle: "拆成低风险行动"
+      },
+      {
+        prompt: "帮我比较两款电脑哪个好",
+        expectedTitle: "建立评价标准和权重"
+      },
+      {
+        prompt: "帮我写一个Python爬虫",
+        expectedTitle: "设计数据结构与模块架构"
+      }
+    ];
+
+    for (const item of cases) {
+      const result = analyzePrompt(item.prompt);
+
+      expect(result.tasks.length).toBeGreaterThanOrEqual(5);
+      expect(result.tasks.some((task) => task.title === item.expectedTitle)).toBe(true);
+      expect(result.optimizedPrompt).toContain(item.expectedTitle);
+      expect(result.tasks.every((task, index) => task.order === index + 1)).toBe(true);
+    }
+  });
 });

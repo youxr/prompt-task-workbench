@@ -40,6 +40,27 @@ const CREATIVE_OBJECT_TERMS = [
   "角色"
 ];
 
+type IntentKind =
+  | "creative"
+  | "software"
+  | "writing"
+  | "research"
+  | "learning"
+  | "data"
+  | "business"
+  | "personalPlan"
+  | "decision"
+  | "generic";
+
+interface IntentProfile {
+  kind: IntentKind;
+  label: string;
+  primaryObject: string;
+  medium: string;
+  missingSlots: string[];
+  defaultAssumption: string;
+}
+
 export function analyzePrompt(
   prompt: string,
   rawOptions: Partial<PromptAnalysisOptions> = {}
@@ -120,6 +141,8 @@ function createTaskDrafts(
   goal: string,
   options: PromptAnalysisOptions
 ): TaskDraft[] {
+  const intent = inferIntentProfile(prompt, goal);
+
   if (isJobEmailPrompt(prompt)) {
     return createJobEmailTasks();
   }
@@ -141,12 +164,257 @@ function createTaskDrafts(
     return withSequentialDependencies(sequenceTasks);
   }
 
+  const intentTasks = createIntentTasks(prompt, goal, intent, options);
+  if (intentTasks.length > 0) {
+    return intentTasks;
+  }
+
   const actionTasks = extractActionTasks(prompt);
   if (actionTasks.length > 0) {
     return withPlanningAndReview(actionTasks, options);
   }
 
-  return createGenericTasks(goal, options);
+  return createGenericTasks(goal, options, intent);
+}
+
+function inferIntentProfile(prompt: string, goal: string): IntentProfile {
+  const primaryObject = extractPrimaryObject(prompt, goal);
+
+  if (isCreativeBuildPrompt(prompt)) {
+    return {
+      kind: "creative",
+      label: "创意制作",
+      primaryObject,
+      medium: inferCreativeMedium(prompt),
+      missingSlots: ["作品形态", "视觉风格", "用途/受众", "验收场景"],
+      defaultAssumption: "默认先做可视化原型或交互小作品，再补表现力和验收标准。"
+    };
+  }
+
+  if (/代码|程序|网站|系统|应用|App|APP|小程序|数据库|接口|前端|后端|React|Vue|Python|爬虫|自动化/.test(prompt)) {
+    return {
+      kind: "software",
+      label: "软件/开发",
+      primaryObject,
+      medium: "可运行的软件方案或代码实现",
+      missingSlots: ["技术栈", "运行环境", "数据来源", "验收方式"],
+      defaultAssumption: "默认先定义需求和数据结构，再实现最小可运行版本，最后测试关键路径。"
+    };
+  }
+
+  if (/数据|表格|Excel|CSV|图表|统计|指标|销售|用户增长|可视化|报表|看板/.test(prompt)) {
+    return {
+      kind: "data",
+      label: "数据分析",
+      primaryObject,
+      medium: "指标报告与可视化建议",
+      missingSlots: ["数据字段", "时间范围", "目标指标", "图表格式"],
+      defaultAssumption: "默认先澄清指标口径，再清洗数据、分析趋势、输出图表和结论。"
+    };
+  }
+
+  if (/选择|决策|要不要|是否|哪个好|推荐|取舍|利弊|优缺点/.test(prompt)) {
+    return {
+      kind: "decision",
+      label: "决策建议",
+      primaryObject,
+      medium: "决策矩阵与建议",
+      missingSlots: ["备选项", "评价标准", "硬约束", "风险偏好"],
+      defaultAssumption: "默认用决策矩阵比较选项，先列标准和权重，再给建议和风险。"
+    };
+  }
+
+  if (/减肥|健身|饮食|旅行|理财|搬家|装修|时间管理|习惯|生活|个人/.test(prompt)) {
+    return {
+      kind: "personalPlan",
+      label: "个人计划",
+      primaryObject,
+      medium: "可执行个人行动计划",
+      missingSlots: ["当前状态", "目标结果", "限制条件", "周期"],
+      defaultAssumption: "默认给出温和可持续方案，先从低风险、可坚持动作开始。"
+    };
+  }
+
+  if (/写|文案|脚本|文章|邮件|报告|PPT|演讲|标题|简介|小红书|公众号|短视频|剧本|故事|论文/.test(prompt)) {
+    return {
+      kind: "writing",
+      label: "内容写作",
+      primaryObject,
+      medium: "结构化内容初稿",
+      missingSlots: ["目标受众", "语气风格", "长度", "发布渠道"],
+      defaultAssumption: "默认使用中文、结构化分段、先给提纲再生成正文并自检。"
+    };
+  }
+
+  if (/调研|分析|竞品|市场|行业|资料|对比|比较|趋势|案例|政策|论文|研究/.test(prompt)) {
+    return {
+      kind: "research",
+      label: "研究分析",
+      primaryObject,
+      medium: "研究框架与结论报告",
+      missingSlots: ["分析范围", "评价维度", "证据来源", "输出格式"],
+      defaultAssumption: "默认先定义研究问题和维度，再收集证据、比较归纳、输出结论。"
+    };
+  }
+
+  if (/学习|复习|考试|课程|读书|训练|背诵|考研|高考|雅思|托福|计划|教程/.test(prompt)) {
+    return {
+      kind: "learning",
+      label: "学习计划",
+      primaryObject,
+      medium: "阶段化学习路径",
+      missingSlots: ["当前水平", "目标分数/成果", "可投入时间", "截止日期"],
+      defaultAssumption: "默认按诊断、阶段计划、每日任务、检测复盘来设计学习路径。"
+    };
+  }
+
+  if (/创业|商业|运营|营销|推广|增长|客户|销售|产品定位|定价|活动|私域|转化/.test(prompt)) {
+    return {
+      kind: "business",
+      label: "商业运营",
+      primaryObject,
+      medium: "业务策略与执行计划",
+      missingSlots: ["目标客户", "业务目标", "预算/资源", "成功指标"],
+      defaultAssumption: "默认按目标、用户、策略、执行动作、指标复盘来生成业务方案。"
+    };
+  }
+
+  return {
+    kind: "generic",
+    label: "通用任务",
+    primaryObject,
+    medium: "结构化执行方案",
+    missingSlots: ["目标受众", "输出格式", "限制条件", "成功标准"],
+    defaultAssumption: "默认把模糊需求转成目标、上下文、执行步骤和验收清单。"
+  };
+}
+
+function extractPrimaryObject(prompt: string, goal: string): string {
+  const cleaned = stripAssistantPrefix(goal || prompt)
+    .replace(/^我想|^我要|^想要|^做个|^做一个|^一个|^请/, "")
+    .trim();
+  return cleaned || prompt.slice(0, 24);
+}
+
+function createIntentTasks(
+  prompt: string,
+  goal: string,
+  intent: IntentProfile,
+  options: PromptAnalysisOptions
+): TaskDraft[] {
+  if (intent.kind === "generic" || isCreativeBuildPrompt(prompt)) {
+    return [];
+  }
+
+  const taskFactories: Record<Exclude<IntentKind, "generic" | "creative">, () => TaskDraft[]> = {
+    software: () => createSoftwareIntentTasks(goal, intent),
+    writing: () => createWritingIntentTasks(goal, intent),
+    research: () => createResearchIntentTasks(goal, intent),
+    learning: () => createLearningIntentTasks(goal, intent),
+    data: () => createDataIntentTasks(goal, intent),
+    business: () => createBusinessIntentTasks(goal, intent),
+    personalPlan: () => createPersonalPlanIntentTasks(goal, intent),
+    decision: () => createDecisionIntentTasks(goal, intent)
+  };
+
+  const tasks = taskFactories[intent.kind as Exclude<IntentKind, "generic" | "creative">]?.() || [];
+  return options.granularity === "compact" ? tasks.slice(0, Math.max(4, tasks.length - 1)) : tasks;
+}
+
+function createSoftwareIntentTasks(goal: string, intent: IntentProfile): TaskDraft[] {
+  return [
+    createIntentDraft("澄清需求与用户路径", `把“${goal}”转为用户、场景、核心功能、边界和成功标准。`, [], intent, ["用户路径", "核心功能", "边界", "成功标准"]),
+    createIntentDraft("设计数据结构与模块架构", "定义页面/模块、数据模型、接口、状态流和错误状态。", ["T1"], intent, ["模块", "数据模型", "接口", "状态"]),
+    createIntentDraft("实现最小可运行版本", "优先实现能跑通主流程的 MVP，并保留可扩展接口。", ["T2"], intent, ["MVP", "主流程", "可运行", "扩展点"]),
+    createIntentDraft("补齐体验与边界状态", "补充加载、空状态、错误提示、响应式和权限/安全边界。", ["T3"], intent, ["加载", "空状态", "错误", "权限"]),
+    createIntentDraft("测试部署与交付说明", "输出测试清单、部署步骤、运行命令和验收标准。", ["T4"], intent, ["测试", "部署", "运行命令", "验收"])
+  ];
+}
+
+function createWritingIntentTasks(goal: string, intent: IntentProfile): TaskDraft[] {
+  return [
+    createIntentDraft("确认受众与传播目标", `明确“${goal}”要说服谁、解决什么问题、希望读者采取什么行动。`, [], intent, ["受众", "目标", "行动", "渠道"]),
+    createIntentDraft("搭建内容结构与卖点", "先给出标题、核心观点、段落结构和信息优先级。", ["T1"], intent, ["标题", "观点", "结构", "优先级"]),
+    createIntentDraft("生成正文初稿", "按结构生成完整内容，控制语气、长度和表达密度。", ["T2"], intent, ["语气", "长度", "正文", "例子"]),
+    createIntentDraft("增强表达与转化", "补充开头钩子、例子、行动号召和可传播表达。", ["T3"], intent, ["钩子", "例子", "行动号召", "传播性"]),
+    createIntentDraft("润色校对与版本输出", "检查错漏、节奏、格式和约束，并输出最终版。", ["T4"], intent, ["校对", "格式", "最终版", "约束"])
+  ];
+}
+
+function createResearchIntentTasks(goal: string, intent: IntentProfile): TaskDraft[] {
+  return [
+    createIntentDraft("定义研究问题与范围", `把“${goal}”拆为研究对象、边界、时间范围和关键问题。`, [], intent, ["研究对象", "范围", "关键问题", "时间"]),
+    createIntentDraft("建立评价维度", "确定比较指标、权重、证据标准和信息来源。", ["T1"], intent, ["维度", "权重", "证据", "来源"]),
+    createIntentDraft("收集与归纳证据", "整理事实、案例、数据和反例，区分确定信息和假设。", ["T2"], intent, ["事实", "案例", "数据", "假设"]),
+    createIntentDraft("形成对比结论", "按维度比较优劣、机会、风险和适用条件。", ["T3"], intent, ["优劣", "机会", "风险", "适用条件"]),
+    createIntentDraft("输出报告与行动建议", "生成结构化报告、摘要、表格和下一步建议。", ["T4"], intent, ["报告", "摘要", "表格", "建议"])
+  ];
+}
+
+function createLearningIntentTasks(goal: string, intent: IntentProfile): TaskDraft[] {
+  return [
+    createIntentDraft("诊断当前水平与目标", `明确“${goal}”的当前基础、目标结果、周期和可投入时间。`, [], intent, ["当前水平", "目标", "周期", "时间"]),
+    createIntentDraft("拆分阶段学习路径", "把目标拆成基础、强化、应用、冲刺或复盘阶段。", ["T1"], intent, ["阶段", "知识点", "练习", "复盘"]),
+    createIntentDraft("制定每日/每周任务", "输出可执行的时间表、任务量、材料和完成标准。", ["T2"], intent, ["时间表", "任务量", "材料", "完成标准"]),
+    createIntentDraft("设计检测与反馈机制", "加入测验、错题、作品或输出任务，形成闭环。", ["T3"], intent, ["测验", "错题", "输出", "反馈"]),
+    createIntentDraft("调整风险与坚持策略", "识别拖延、过载、资源不足等风险并给替代方案。", ["T4"], intent, ["风险", "替代方案", "节奏", "坚持"])
+  ];
+}
+
+function createDataIntentTasks(goal: string, intent: IntentProfile): TaskDraft[] {
+  return [
+    createIntentDraft("明确指标口径与问题", `确定“${goal}”要回答的问题、指标定义、时间范围和分组维度。`, [], intent, ["指标", "口径", "时间范围", "维度"]),
+    createIntentDraft("检查数据结构与质量", "识别字段、缺失值、异常值、重复项和采样偏差。", ["T1"], intent, ["字段", "缺失", "异常", "偏差"]),
+    createIntentDraft("执行分析与可视化", "计算核心指标、趋势、对比、贡献因素并建议图表。", ["T2"], intent, ["趋势", "对比", "贡献", "图表"]),
+    createIntentDraft("提炼洞察与业务解释", "把数据发现转成原因假设、影响判断和行动机会。", ["T3"], intent, ["洞察", "原因", "影响", "机会"]),
+    createIntentDraft("输出报告与复查清单", "生成报告、图表说明、结论、建议和数据局限。", ["T4"], intent, ["报告", "结论", "建议", "局限"])
+  ];
+}
+
+function createBusinessIntentTasks(goal: string, intent: IntentProfile): TaskDraft[] {
+  return [
+    createIntentDraft("锁定业务目标与用户", `明确“${goal}”服务的客户、场景、目标指标和资源边界。`, [], intent, ["客户", "场景", "指标", "资源"]),
+    createIntentDraft("拆解增长或运营杠杆", "分析获客、转化、留存、复购、传播或效率提升机会。", ["T1"], intent, ["获客", "转化", "留存", "复购"]),
+    createIntentDraft("设计执行方案", "制定活动、内容、渠道、节奏、预算和负责人。", ["T2"], intent, ["活动", "渠道", "预算", "负责人"]),
+    createIntentDraft("建立指标与实验机制", "定义实验假设、监测指标、对照方案和复盘周期。", ["T3"], intent, ["实验", "指标", "对照", "复盘"]),
+    createIntentDraft("输出风险与备选策略", "识别成本、合规、执行和市场风险，给出备选方案。", ["T4"], intent, ["成本", "合规", "执行", "备选"])
+  ];
+}
+
+function createPersonalPlanIntentTasks(goal: string, intent: IntentProfile): TaskDraft[] {
+  return [
+    createIntentDraft("确认当前状态与目标", `明确“${goal}”的起点、期望结果、周期、健康/预算/时间限制。`, [], intent, ["起点", "目标", "周期", "限制"]),
+    createIntentDraft("拆成低风险行动", "把目标转为每天/每周可执行的小动作，避免一开始过载。", ["T1"], intent, ["日行动", "周计划", "低风险", "可坚持"]),
+    createIntentDraft("设计监测与反馈", "定义记录方式、检查频率、调整条件和奖励机制。", ["T2"], intent, ["记录", "检查", "调整", "奖励"]),
+    createIntentDraft("处理障碍与替代方案", "识别时间不足、资源不足、情绪波动等障碍并给替代动作。", ["T3"], intent, ["障碍", "替代", "弹性", "恢复"]),
+    createIntentDraft("输出完整执行计划", "生成时间表、清单、注意事项和复盘模板。", ["T4"], intent, ["时间表", "清单", "注意事项", "复盘"])
+  ];
+}
+
+function createDecisionIntentTasks(goal: string, intent: IntentProfile): TaskDraft[] {
+  return [
+    createIntentDraft("明确决策问题与备选项", `把“${goal}”转为可比较的选项、硬约束和目标。`, [], intent, ["备选项", "目标", "硬约束", "时间"]),
+    createIntentDraft("建立评价标准和权重", "定义成本、收益、风险、可逆性、长期影响等评价维度。", ["T1"], intent, ["成本", "收益", "风险", "权重"]),
+    createIntentDraft("逐项比较与打分", "按标准比较每个选项，列出证据、假设和不确定性。", ["T2"], intent, ["打分", "证据", "假设", "不确定性"]),
+    createIntentDraft("给出建议与触发条件", "输出首选方案、备选方案、何时改变决策和止损条件。", ["T3"], intent, ["首选", "备选", "触发", "止损"]),
+    createIntentDraft("形成行动清单", "把决策转成下一步行动、负责人、时间点和验证方式。", ["T4"], intent, ["行动", "负责人", "时间点", "验证"])
+  ];
+}
+
+function createIntentDraft(
+  title: string,
+  description: string,
+  dependsOn: string[],
+  intent: IntentProfile,
+  contextHints: string[]
+): TaskDraft {
+  return {
+    title,
+    description,
+    dependsOn,
+    rationale: `${intent.label}类任务需要先补齐关键上下文，再产出可执行结果。`,
+    contextHints
+  };
 }
 
 function isJobEmailPrompt(prompt: string): boolean {
@@ -480,11 +748,11 @@ function withPlanningAndReview(tasks: TaskDraft[], options: PromptAnalysisOption
   return result;
 }
 
-function createGenericTasks(goal: string, options: PromptAnalysisOptions): TaskDraft[] {
+function createGenericTasks(goal: string, options: PromptAnalysisOptions, intent: IntentProfile): TaskDraft[] {
   const tasks: TaskDraft[] = [
     {
       title: "提取目标与成功标准",
-      description: `把“${goal}”转写为明确目标、受众、交付物和完成标准。`,
+      description: `把“${goal}”转写为明确目标、受众、交付物和完成标准，并按${intent.label}思路补齐缺失信息。`,
       dependsOn: [],
       rationale: "泛化提示词通常缺少可执行边界，先提取目标最稳。",
       contextHints: ["受众", "交付物", "成功标准"]
