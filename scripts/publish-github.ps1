@@ -4,6 +4,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$ProjectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+Set-Location $ProjectRoot
 
 if (-not (Test-Path ".git")) {
   git init
@@ -12,8 +14,14 @@ if (-not (Test-Path ".git")) {
 
 git status --short
 
-$existing = git remote get-url origin 2>$null
-if ($LASTEXITCODE -eq 0 -and $existing) {
+$existing = $null
+try {
+  $existing = git remote get-url origin 2>$null
+} catch {
+  $existing = $null
+}
+
+if ($existing) {
   git remote set-url origin $RemoteUrl
 } else {
   git remote add origin $RemoteUrl
