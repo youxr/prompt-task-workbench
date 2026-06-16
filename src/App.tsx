@@ -6,7 +6,7 @@ import { buildWorkspaceBlueprint } from "./lib/workspace";
 import type { AdminStats, AnalysisLog, PublicUser } from "./lib/authTypes";
 import type { AnalysisMode, AnalysisResult, Granularity, PromptAnalysisOptions } from "./lib/types";
 
-const DEFAULT_PROMPT = "帮我做一个电商网站，包括商品页、购物车、订单和后台管理";
+const DEFAULT_PROMPT = "";
 const TOKEN_STORAGE_KEY = "prompt-workbench-token";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
@@ -25,7 +25,7 @@ function App() {
     })
   );
   const [isLoading, setIsLoading] = useState(false);
-  const [status, setStatus] = useState("已使用本地规则生成初始分析。");
+  const [status, setStatus] = useState("输入提示词后会实时生成本地预览，点击开始分析可保存记录并启用 LLM 增强。");
   const [copied, setCopied] = useState(false);
   const [contractCopied, setContractCopied] = useState(false);
   const [authToken, setAuthToken] = useState(() => localStorage.getItem(TOKEN_STORAGE_KEY) || "");
@@ -132,6 +132,23 @@ function App() {
       void loadAdminData(authToken);
     }
   }, [authToken, currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    const livePreview = analyzePrompt(prompt, {
+      ...options,
+      mode: "local"
+    });
+    setAnalysis(livePreview);
+    setStatus(
+      prompt.trim()
+        ? "已根据当前输入刷新本地实时预览。点击开始分析可保存记录，或在混合/LLM 模式下尝试增强。"
+        : "请输入提示词，系统会实时刷新下面的元任务和执行工作台。"
+    );
+  }, [currentUser, options, prompt]);
 
   async function handleCopyContract() {
     await navigator.clipboard.writeText(workspace.executionContract.contractPrompt);
