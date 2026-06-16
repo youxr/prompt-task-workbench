@@ -1,0 +1,589 @@
+{
+  "generatedAt": "2026-06-02",
+  "baselineDefinition": "Baseline = 直接把原始提示词交给模型，不显式拆分任务、不标注依赖、不做重要度评分、不加入上下文工程自检。",
+  "summary": {
+    "caseCount": 6,
+    "averageBaseline": 33,
+    "averageOptimized": 89,
+    "averageDelta": 56,
+    "averageDeltaPercent": 170,
+    "strongestMetric": "自检与风险控制",
+    "strongestCase": "多步骤项目：电商网站"
+  },
+  "workSummary": [
+    "实现了本地规则分析器：识别目标、动作、交付物、约束、显式顺序和常见项目流程。",
+    "把复杂提示词拆成 AtomicTask，并为每个任务生成依赖、顺序、重要度、原因和上下文提示。",
+    "生成结构化优化提示词，包含核心目标、缺失信息、默认假设、任务表、上下文工程要求和最终自检。",
+    "提供 LLM 增强后端代理，未配置 API key 时自动降级，保证演示和测试可复现。"
+  ],
+  "capabilityCoverage": [
+    "单任务写作：能补齐必要上下文并加入最终润色检查。",
+    "复杂项目规划：能形成需求、架构、数据、实现、串联、测试的稳定顺序。",
+    "因果顺序：能保留“先/再/然后”等显式时序并转成依赖边。",
+    "长上下文整理：能把背景、约束、输出和默认假设分区，降低中间信息丢失风险。",
+    "风险任务：能把安全、测试、部署、回滚等高风险环节抬高重要度。"
+  ],
+  "cases": [
+    {
+      "id": "case-job-email",
+      "title": "单任务：求职邮件",
+      "category": "单任务写作",
+      "prompt": "帮我写一封求职邮件",
+      "successCriteria": [
+        "拆出目标确认",
+        "补全岗位/收件人信息",
+        "生成正文",
+        "润色检查"
+      ],
+      "baselinePrompt": "帮我写一封求职邮件",
+      "optimizedPromptPreview": "你是一个严谨的 AI 任务执行助手。请围绕以下目标完成任务，并严格按依赖顺序执行。\n\n# 核心目标\n写一封求职邮件\n\n# 原始提示词\n帮我写一封求职邮件\n\n# 缺失信息与默认处理\n如果信息缺失，请先列出待确认问题；若用户要求直接执行，则使用下列默认假设继续：\n- 目标受众或使用场景\n- 期望输出格式\n- 公司、岗位和收件人信息\n\n# 默认假设\n- 若未提供受众，默认面向普通中文用户，优先保证清晰和可执行。\n- 若未提供格式，默认使用 Markdown 分节、任务表和检查清单。\n- 未声明禁区时，只保留与目标直接相关的上下文，减少噪声。\n\n# 执行任务表\n1. [中 74/100] 确认求职目标与邮件场景\n   - 依赖：无\n   - 执行：明确目标岗位、收件人、投递目的和希望对方采取的下一步行动。\n   - 验",
+      "taskTitles": [
+        "确认求职目标与邮件场景",
+        "补全收件人与候选人信息",
+        "撰写邮件正文",
+        "润色并检查可发送性"
+      ],
+      "dependencyEdges": 3,
+      "metricResults": [
+        {
+          "key": "taskCoverage",
+          "label": "任务覆盖率",
+          "baseline": 48,
+          "optimized": 86,
+          "delta": 38,
+          "deltaPercent": 79,
+          "baselineEvidence": "baseline 只保留原始自然语言，复杂动作容易被模型合并或遗漏。",
+          "optimizedEvidence": "生成 4 个可执行元任务，每个任务都有说明和验收提示。"
+        },
+        {
+          "key": "dependencyClarity",
+          "label": "依赖顺序清晰度",
+          "baseline": 28,
+          "optimized": 88,
+          "delta": 60,
+          "deltaPercent": 214,
+          "baselineEvidence": "baseline 没有显式依赖边，模型需要自行猜测先后关系。",
+          "optimizedEvidence": "输出 3 条依赖关系，并保留 order 字段。"
+        },
+        {
+          "key": "importanceDistinction",
+          "label": "重要度区分",
+          "baseline": 18,
+          "optimized": 96,
+          "delta": 78,
+          "deltaPercent": 433,
+          "baselineEvidence": "baseline 没有优先级，所有要求在上下文中权重接近。",
+          "optimizedEvidence": "任务重要度范围为 52-74 分。"
+        },
+        {
+          "key": "contextSignal",
+          "label": "上下文信号质量",
+          "baseline": 35,
+          "optimized": 92,
+          "delta": 57,
+          "deltaPercent": 163,
+          "baselineEvidence": "baseline 把背景、目标、约束和输出要求混在一起。",
+          "optimizedEvidence": "分离目标、缺失信息、默认假设和 5 个上下文工程优化点。"
+        },
+        {
+          "key": "outputControl",
+          "label": "输出可控性",
+          "baseline": 42,
+          "optimized": 82,
+          "delta": 40,
+          "deltaPercent": 95,
+          "baselineEvidence": "baseline 通常没有固定输出结构，结果稳定性取决于模型临场发挥。",
+          "optimizedEvidence": "优化提示词强制包含摘要、按序结果、高重要度标注和自检清单。"
+        },
+        {
+          "key": "selfCheck",
+          "label": "自检与风险控制",
+          "baseline": 20,
+          "optimized": 94,
+          "delta": 74,
+          "deltaPercent": 370,
+          "baselineEvidence": "baseline 没有生成后检查机制，容易漏掉约束、顺序或格式问题。",
+          "optimizedEvidence": "优化提示词包含最终自检，要求检查目标覆盖、顺序和约束。"
+        }
+      ],
+      "averageBaseline": 32,
+      "averageOptimized": 90,
+      "averageDelta": 58,
+      "verdict": "强提升：结构化任务、依赖和自检显著优于 baseline。",
+      "advantages": [
+        "拆出 4 个元任务，避免把多个动作挤在一次生成里。",
+        "生成 3 条依赖边，明确先后关系。",
+        "加入 5 个上下文工程优化点，包含目标锚定和最终自检。"
+      ]
+    },
+    {
+      "id": "case-ecommerce",
+      "title": "多步骤项目：电商网站",
+      "category": "复杂项目规划",
+      "prompt": "帮我做一个电商网站，包括商品页、购物车、订单和后台管理",
+      "successCriteria": [
+        "需求澄清",
+        "信息架构",
+        "数据模型",
+        "页面实现",
+        "业务流程串联",
+        "测试验收"
+      ],
+      "baselinePrompt": "帮我做一个电商网站，包括商品页、购物车、订单和后台管理",
+      "optimizedPromptPreview": "你是一个严谨的 AI 任务执行助手。请围绕以下目标完成任务，并严格按依赖顺序执行。\n\n# 核心目标\n做一个电商网站，包括商品页、购物车、订单和后台管理\n\n# 原始提示词\n帮我做一个电商网站，包括商品页、购物车、订单和后台管理\n\n# 缺失信息与默认处理\n如果信息缺失，请先列出待确认问题；若用户要求直接执行，则使用下列默认假设继续：\n- 目标受众或使用场景\n- 期望输出格式\n- 技术栈、数据来源和部署约束\n\n# 默认假设\n- 若未提供受众，默认面向普通中文用户，优先保证清晰和可执行。\n- 若未提供格式，默认使用 Markdown 分节、任务表和检查清单。\n- 项目型任务默认先做需求和数据结构，再做页面实现和测试。\n- 未声明禁区时，只保留与目标直接相关的上下文，减少噪声。\n\n# 执行任务表\n1. [高 84/100",
+      "taskTitles": [
+        "澄清产品目标与边界",
+        "规划信息架构与功能模块",
+        "设计数据模型与状态流",
+        "实现核心页面与交互",
+        "串联业务流程和上下文状态",
+        "测试关键路径并输出验收清单"
+      ],
+      "dependencyEdges": 6,
+      "metricResults": [
+        {
+          "key": "taskCoverage",
+          "label": "任务覆盖率",
+          "baseline": 38,
+          "optimized": 96,
+          "delta": 58,
+          "deltaPercent": 153,
+          "baselineEvidence": "baseline 只保留原始自然语言，复杂动作容易被模型合并或遗漏。",
+          "optimizedEvidence": "生成 6 个可执行元任务，每个任务都有说明和验收提示。"
+        },
+        {
+          "key": "dependencyClarity",
+          "label": "依赖顺序清晰度",
+          "baseline": 24,
+          "optimized": 96,
+          "delta": 72,
+          "deltaPercent": 300,
+          "baselineEvidence": "baseline 没有显式依赖边，模型需要自行猜测先后关系。",
+          "optimizedEvidence": "输出 6 条依赖关系，并保留 order 字段。"
+        },
+        {
+          "key": "importanceDistinction",
+          "label": "重要度区分",
+          "baseline": 18,
+          "optimized": 96,
+          "delta": 78,
+          "deltaPercent": 433,
+          "baselineEvidence": "baseline 没有优先级，所有要求在上下文中权重接近。",
+          "optimizedEvidence": "任务重要度范围为 62-92 分。"
+        },
+        {
+          "key": "contextSignal",
+          "label": "上下文信号质量",
+          "baseline": 32,
+          "optimized": 92,
+          "delta": 60,
+          "deltaPercent": 188,
+          "baselineEvidence": "baseline 把背景、目标、约束和输出要求混在一起。",
+          "optimizedEvidence": "分离目标、缺失信息、默认假设和 5 个上下文工程优化点。"
+        },
+        {
+          "key": "outputControl",
+          "label": "输出可控性",
+          "baseline": 36,
+          "optimized": 82,
+          "delta": 46,
+          "deltaPercent": 128,
+          "baselineEvidence": "baseline 通常没有固定输出结构，结果稳定性取决于模型临场发挥。",
+          "optimizedEvidence": "优化提示词强制包含摘要、按序结果、高重要度标注和自检清单。"
+        },
+        {
+          "key": "selfCheck",
+          "label": "自检与风险控制",
+          "baseline": 18,
+          "optimized": 96,
+          "delta": 78,
+          "deltaPercent": 433,
+          "baselineEvidence": "baseline 没有生成后检查机制，容易漏掉约束、顺序或格式问题。",
+          "optimizedEvidence": "优化提示词包含最终自检，要求检查目标覆盖、顺序和约束。"
+        }
+      ],
+      "averageBaseline": 28,
+      "averageOptimized": 93,
+      "averageDelta": 65,
+      "verdict": "强提升：结构化任务、依赖和自检显著优于 baseline。",
+      "advantages": [
+        "拆出 6 个元任务，避免把多个动作挤在一次生成里。",
+        "生成 6 条依赖边，明确先后关系。",
+        "加入 5 个上下文工程优化点，包含目标锚定和最终自检。"
+      ]
+    },
+    {
+      "id": "case-sequence",
+      "title": "显式顺序：竞品到文案",
+      "category": "因果顺序",
+      "prompt": "先分析竞品，再设计功能，然后写推广文案",
+      "successCriteria": [
+        "保留竞品分析在前",
+        "功能设计依赖竞品结论",
+        "推广文案依赖功能设计"
+      ],
+      "baselinePrompt": "先分析竞品，再设计功能，然后写推广文案",
+      "optimizedPromptPreview": "你是一个严谨的 AI 任务执行助手。请围绕以下目标完成任务，并严格按依赖顺序执行。\n\n# 核心目标\n先分析竞品，再设计功能，然后写推广文案\n\n# 原始提示词\n先分析竞品，再设计功能，然后写推广文案\n\n# 缺失信息与默认处理\n如果信息缺失，请先列出待确认问题；若用户要求直接执行，则使用下列默认假设继续：\n- 目标受众或使用场景\n- 期望输出格式\n\n# 默认假设\n- 若未提供受众，默认面向普通中文用户，优先保证清晰和可执行。\n- 若未提供格式，默认使用 Markdown 分节、任务表和检查清单。\n- 未声明禁区时，只保留与目标直接相关的上下文，减少噪声。\n\n# 执行任务表\n1. [高 98/100] 分析竞品\n   - 依赖：无\n   - 执行：围绕“分析竞品”完成一个单一、可验证的执行步骤，并明确输入与输出。\n ",
+      "taskTitles": [
+        "分析竞品",
+        "设计功能",
+        "写推广文案"
+      ],
+      "dependencyEdges": 2,
+      "metricResults": [
+        {
+          "key": "taskCoverage",
+          "label": "任务覆盖率",
+          "baseline": 58,
+          "optimized": 79,
+          "delta": 21,
+          "deltaPercent": 36,
+          "baselineEvidence": "baseline 只保留原始自然语言，复杂动作容易被模型合并或遗漏。",
+          "optimizedEvidence": "生成 3 个可执行元任务，每个任务都有说明和验收提示。"
+        },
+        {
+          "key": "dependencyClarity",
+          "label": "依赖顺序清晰度",
+          "baseline": 46,
+          "optimized": 78,
+          "delta": 32,
+          "deltaPercent": 70,
+          "baselineEvidence": "baseline 没有显式依赖边，模型需要自行猜测先后关系。",
+          "optimizedEvidence": "输出 2 条依赖关系，并保留 order 字段。"
+        },
+        {
+          "key": "importanceDistinction",
+          "label": "重要度区分",
+          "baseline": 20,
+          "optimized": 95,
+          "delta": 75,
+          "deltaPercent": 375,
+          "baselineEvidence": "baseline 没有优先级，所有要求在上下文中权重接近。",
+          "optimizedEvidence": "任务重要度范围为 82-98 分。"
+        },
+        {
+          "key": "contextSignal",
+          "label": "上下文信号质量",
+          "baseline": 42,
+          "optimized": 89,
+          "delta": 47,
+          "deltaPercent": 112,
+          "baselineEvidence": "baseline 把背景、目标、约束和输出要求混在一起。",
+          "optimizedEvidence": "分离目标、缺失信息、默认假设和 5 个上下文工程优化点。"
+        },
+        {
+          "key": "outputControl",
+          "label": "输出可控性",
+          "baseline": 40,
+          "optimized": 82,
+          "delta": 42,
+          "deltaPercent": 105,
+          "baselineEvidence": "baseline 通常没有固定输出结构，结果稳定性取决于模型临场发挥。",
+          "optimizedEvidence": "优化提示词强制包含摘要、按序结果、高重要度标注和自检清单。"
+        },
+        {
+          "key": "selfCheck",
+          "label": "自检与风险控制",
+          "baseline": 18,
+          "optimized": 92,
+          "delta": 74,
+          "deltaPercent": 411,
+          "baselineEvidence": "baseline 没有生成后检查机制，容易漏掉约束、顺序或格式问题。",
+          "optimizedEvidence": "优化提示词包含最终自检，要求检查目标覆盖、顺序和约束。"
+        }
+      ],
+      "averageBaseline": 37,
+      "averageOptimized": 86,
+      "averageDelta": 49,
+      "verdict": "强提升：结构化任务、依赖和自检显著优于 baseline。",
+      "advantages": [
+        "拆出 3 个元任务，避免把多个动作挤在一次生成里。",
+        "生成 2 条依赖边，明确先后关系。",
+        "加入 5 个上下文工程优化点，包含目标锚定和最终自检。"
+      ]
+    },
+    {
+      "id": "case-long-context",
+      "title": "长提示词：背景、约束与多目标",
+      "category": "长上下文整理",
+      "prompt": "我们准备发布一个面向大学生的学习工具，背景是用户经常不知道如何把课程资料整理成复习计划。请你分析需求、拆解功能、写出产品介绍和三条推广文案，还要注意语气年轻、不要夸大效果，输出结构清晰。",
+      "successCriteria": [
+        "提取核心目标",
+        "压缩背景",
+        "分离约束",
+        "覆盖分析/功能/介绍/文案"
+      ],
+      "baselinePrompt": "我们准备发布一个面向大学生的学习工具，背景是用户经常不知道如何把课程资料整理成复习计划。请你分析需求、拆解功能、写出产品介绍和三条推广文案，还要注意语气年轻、不要夸大效果，输出结构清晰。",
+      "optimizedPromptPreview": "你是一个严谨的 AI 任务执行助手。请围绕以下目标完成任务，并严格按依赖顺序执行。\n\n# 核心目标\n我们准备发布一个面向大学生的学习工具，背景是用户经常不知道如何把课程资料整理成复习计划\n\n# 原始提示词\n我们准备发布一个面向大学生的学习工具，背景是用户经常不知道如何把课程资料整理成复习计划。请你分析需求、拆解功能、写出产品介绍和三条推广文案，还要注意语气年轻、不要夸大效果，输出结构清晰。\n\n# 缺失信息与默认处理\n如果信息缺失，请先列出待确认问题；若用户要求直接执行，则使用下列默认假设继续：\n- 暂无明显缺失信息。\n\n# 默认假设\n- 不额外引入假设。\n\n# 执行任务表\n1. [中 74/100] 确认目标、约束与交付格式\n   - 依赖：无\n   - 执行：提取最终目标、必要上下文、输出格式和不能违反的约束",
+      "taskTitles": [
+        "确认目标、约束与交付格式",
+        "整理成复习计划",
+        "分析需求",
+        "拆解功能",
+        "写出产品介绍和三条推广文案",
+        "自检覆盖率与约束遵循"
+      ],
+      "dependencyEdges": 5,
+      "metricResults": [
+        {
+          "key": "taskCoverage",
+          "label": "任务覆盖率",
+          "baseline": 42,
+          "optimized": 96,
+          "delta": 54,
+          "deltaPercent": 129,
+          "baselineEvidence": "baseline 只保留原始自然语言，复杂动作容易被模型合并或遗漏。",
+          "optimizedEvidence": "生成 6 个可执行元任务，每个任务都有说明和验收提示。"
+        },
+        {
+          "key": "dependencyClarity",
+          "label": "依赖顺序清晰度",
+          "baseline": 26,
+          "optimized": 96,
+          "delta": 70,
+          "deltaPercent": 269,
+          "baselineEvidence": "baseline 没有显式依赖边，模型需要自行猜测先后关系。",
+          "optimizedEvidence": "输出 5 条依赖关系，并保留 order 字段。"
+        },
+        {
+          "key": "importanceDistinction",
+          "label": "重要度区分",
+          "baseline": 22,
+          "optimized": 96,
+          "delta": 74,
+          "deltaPercent": 336,
+          "baselineEvidence": "baseline 没有优先级，所有要求在上下文中权重接近。",
+          "optimizedEvidence": "任务重要度范围为 64-98 分。"
+        },
+        {
+          "key": "contextSignal",
+          "label": "上下文信号质量",
+          "baseline": 30,
+          "optimized": 83,
+          "delta": 53,
+          "deltaPercent": 177,
+          "baselineEvidence": "baseline 把背景、目标、约束和输出要求混在一起。",
+          "optimizedEvidence": "分离目标、缺失信息、默认假设和 5 个上下文工程优化点。"
+        },
+        {
+          "key": "outputControl",
+          "label": "输出可控性",
+          "baseline": 44,
+          "optimized": 82,
+          "delta": 38,
+          "deltaPercent": 86,
+          "baselineEvidence": "baseline 通常没有固定输出结构，结果稳定性取决于模型临场发挥。",
+          "optimizedEvidence": "优化提示词强制包含摘要、按序结果、高重要度标注和自检清单。"
+        },
+        {
+          "key": "selfCheck",
+          "label": "自检与风险控制",
+          "baseline": 22,
+          "optimized": 96,
+          "delta": 74,
+          "deltaPercent": 336,
+          "baselineEvidence": "baseline 没有生成后检查机制，容易漏掉约束、顺序或格式问题。",
+          "optimizedEvidence": "优化提示词包含最终自检，要求检查目标覆盖、顺序和约束。"
+        }
+      ],
+      "averageBaseline": 31,
+      "averageOptimized": 92,
+      "averageDelta": 61,
+      "verdict": "强提升：结构化任务、依赖和自检显著优于 baseline。",
+      "advantages": [
+        "拆出 6 个元任务，避免把多个动作挤在一次生成里。",
+        "生成 5 条依赖边，明确先后关系。",
+        "加入 5 个上下文工程优化点，包含目标锚定和最终自检。"
+      ]
+    },
+    {
+      "id": "case-risk",
+      "title": "高风险任务：支付上线检查",
+      "category": "风险与验证",
+      "prompt": "帮我规划一个支付功能上线方案，要考虑安全、订单状态、失败重试、测试和部署回滚",
+      "successCriteria": [
+        "识别高风险项",
+        "先设计状态与安全",
+        "覆盖测试",
+        "包含回滚与验证"
+      ],
+      "baselinePrompt": "帮我规划一个支付功能上线方案，要考虑安全、订单状态、失败重试、测试和部署回滚",
+      "optimizedPromptPreview": "你是一个严谨的 AI 任务执行助手。请围绕以下目标完成任务，并严格按依赖顺序执行。\n\n# 核心目标\n规划一个支付功能上线方案，要考虑安全、订单状态、失败重试、测试和部署回滚\n\n# 原始提示词\n帮我规划一个支付功能上线方案，要考虑安全、订单状态、失败重试、测试和部署回滚\n\n# 缺失信息与默认处理\n如果信息缺失，请先列出待确认问题；若用户要求直接执行，则使用下列默认假设继续：\n- 目标受众或使用场景\n- 期望输出格式\n\n# 默认假设\n- 若未提供受众，默认面向普通中文用户，优先保证清晰和可执行。\n- 若未提供格式，默认使用 Markdown 分节、任务表和检查清单。\n- 未声明禁区时，只保留与目标直接相关的上下文，减少噪声。\n\n# 执行任务表\n1. [高 92/100] 明确上线目标与风险边界\n   - 依赖：无\n",
+      "taskTitles": [
+        "明确上线目标与风险边界",
+        "设计安全与订单状态策略",
+        "规划失败重试与降级回滚",
+        "制定测试与上线验证清单",
+        "输出上线决策与责任分工"
+      ],
+      "dependencyEdges": 4,
+      "metricResults": [
+        {
+          "key": "taskCoverage",
+          "label": "任务覆盖率",
+          "baseline": 44,
+          "optimized": 93,
+          "delta": 49,
+          "deltaPercent": 111,
+          "baselineEvidence": "baseline 只保留原始自然语言，复杂动作容易被模型合并或遗漏。",
+          "optimizedEvidence": "生成 5 个可执行元任务，每个任务都有说明和验收提示。"
+        },
+        {
+          "key": "dependencyClarity",
+          "label": "依赖顺序清晰度",
+          "baseline": 30,
+          "optimized": 96,
+          "delta": 66,
+          "deltaPercent": 220,
+          "baselineEvidence": "baseline 没有显式依赖边，模型需要自行猜测先后关系。",
+          "optimizedEvidence": "输出 4 条依赖关系，并保留 order 字段。"
+        },
+        {
+          "key": "importanceDistinction",
+          "label": "重要度区分",
+          "baseline": 24,
+          "optimized": 96,
+          "delta": 72,
+          "deltaPercent": 300,
+          "baselineEvidence": "baseline 没有优先级，所有要求在上下文中权重接近。",
+          "optimizedEvidence": "任务重要度范围为 70-92 分。"
+        },
+        {
+          "key": "contextSignal",
+          "label": "上下文信号质量",
+          "baseline": 38,
+          "optimized": 89,
+          "delta": 51,
+          "deltaPercent": 134,
+          "baselineEvidence": "baseline 把背景、目标、约束和输出要求混在一起。",
+          "optimizedEvidence": "分离目标、缺失信息、默认假设和 5 个上下文工程优化点。"
+        },
+        {
+          "key": "outputControl",
+          "label": "输出可控性",
+          "baseline": 40,
+          "optimized": 82,
+          "delta": 42,
+          "deltaPercent": 105,
+          "baselineEvidence": "baseline 通常没有固定输出结构，结果稳定性取决于模型临场发挥。",
+          "optimizedEvidence": "优化提示词强制包含摘要、按序结果、高重要度标注和自检清单。"
+        },
+        {
+          "key": "selfCheck",
+          "label": "自检与风险控制",
+          "baseline": 24,
+          "optimized": 96,
+          "delta": 72,
+          "deltaPercent": 300,
+          "baselineEvidence": "baseline 没有生成后检查机制，容易漏掉约束、顺序或格式问题。",
+          "optimizedEvidence": "优化提示词包含最终自检，要求检查目标覆盖、顺序和约束。"
+        }
+      ],
+      "averageBaseline": 33,
+      "averageOptimized": 92,
+      "averageDelta": 59,
+      "verdict": "强提升：结构化任务、依赖和自检显著优于 baseline。",
+      "advantages": [
+        "拆出 5 个元任务，避免把多个动作挤在一次生成里。",
+        "生成 4 条依赖边，明确先后关系。",
+        "加入 5 个上下文工程优化点，包含目标锚定和最终自检。"
+      ]
+    },
+    {
+      "id": "case-research-report",
+      "title": "研究报告：调研、比较与建议",
+      "category": "研究分析",
+      "prompt": "请调研三款 AI 笔记产品，比较功能、价格、目标用户和优缺点，最后给出选型建议和表格",
+      "successCriteria": [
+        "拆出调研",
+        "拆出比较维度",
+        "生成选型建议",
+        "保留表格输出要求"
+      ],
+      "baselinePrompt": "请调研三款 AI 笔记产品，比较功能、价格、目标用户和优缺点，最后给出选型建议和表格",
+      "optimizedPromptPreview": "你是一个严谨的 AI 任务执行助手。请围绕以下目标完成任务，并严格按依赖顺序执行。\n\n# 核心目标\n调研三款 AI 笔记产品，比较功能、价格、目标用户和优缺点，最后给出选型建议和表格\n\n# 原始提示词\n请调研三款 AI 笔记产品，比较功能、价格、目标用户和优缺点，最后给出选型建议和表格\n\n# 缺失信息与默认处理\n如果信息缺失，请先列出待确认问题；若用户要求直接执行，则使用下列默认假设继续：\n- 暂无明显缺失信息。\n\n# 默认假设\n- 未声明禁区时，只保留与目标直接相关的上下文，减少噪声。\n\n# 执行任务表\n1. [高 90/100] 调研三款 AI 笔记产品\n   - 依赖：无\n   - 执行：围绕“调研三款 AI 笔记产品”完成一个单一、可验证的执行步骤，并明确输入与输出。\n   - 验收：输入材料；输出格式",
+      "taskTitles": [
+        "调研三款 AI 笔记产品",
+        "比较功能、价格、目标用户和优缺点",
+        "给出选型建议和表格"
+      ],
+      "dependencyEdges": 2,
+      "metricResults": [
+        {
+          "key": "taskCoverage",
+          "label": "任务覆盖率",
+          "baseline": 50,
+          "optimized": 79,
+          "delta": 29,
+          "deltaPercent": 58,
+          "baselineEvidence": "baseline 只保留原始自然语言，复杂动作容易被模型合并或遗漏。",
+          "optimizedEvidence": "生成 3 个可执行元任务，每个任务都有说明和验收提示。"
+        },
+        {
+          "key": "dependencyClarity",
+          "label": "依赖顺序清晰度",
+          "baseline": 34,
+          "optimized": 78,
+          "delta": 44,
+          "deltaPercent": 129,
+          "baselineEvidence": "baseline 没有显式依赖边，模型需要自行猜测先后关系。",
+          "optimizedEvidence": "输出 2 条依赖关系，并保留 order 字段。"
+        },
+        {
+          "key": "importanceDistinction",
+          "label": "重要度区分",
+          "baseline": 24,
+          "optimized": 79,
+          "delta": 55,
+          "deltaPercent": 229,
+          "baselineEvidence": "baseline 没有优先级，所有要求在上下文中权重接近。",
+          "optimizedEvidence": "任务重要度范围为 82-90 分。"
+        },
+        {
+          "key": "contextSignal",
+          "label": "上下文信号质量",
+          "baseline": 40,
+          "optimized": 83,
+          "delta": 43,
+          "deltaPercent": 108,
+          "baselineEvidence": "baseline 把背景、目标、约束和输出要求混在一起。",
+          "optimizedEvidence": "分离目标、缺失信息、默认假设和 5 个上下文工程优化点。"
+        },
+        {
+          "key": "outputControl",
+          "label": "输出可控性",
+          "baseline": 58,
+          "optimized": 82,
+          "delta": 24,
+          "deltaPercent": 41,
+          "baselineEvidence": "baseline 通常没有固定输出结构，结果稳定性取决于模型临场发挥。",
+          "optimizedEvidence": "优化提示词强制包含摘要、按序结果、高重要度标注和自检清单。"
+        },
+        {
+          "key": "selfCheck",
+          "label": "自检与风险控制",
+          "baseline": 22,
+          "optimized": 92,
+          "delta": 70,
+          "deltaPercent": 318,
+          "baselineEvidence": "baseline 没有生成后检查机制，容易漏掉约束、顺序或格式问题。",
+          "optimizedEvidence": "优化提示词包含最终自检，要求检查目标覆盖、顺序和约束。"
+        }
+      ],
+      "averageBaseline": 38,
+      "averageOptimized": 82,
+      "averageDelta": 44,
+      "verdict": "明显提升：主要改善覆盖率、顺序和输出稳定性。",
+      "advantages": [
+        "拆出 3 个元任务，避免把多个动作挤在一次生成里。",
+        "生成 2 条依赖边，明确先后关系。",
+        "加入 5 个上下文工程优化点，包含目标锚定和最终自检。"
+      ]
+    }
+  ],
+  "limitations": [
+    "当前分数是启发式离线评估，用来衡量结构化程度，不等价于真实模型调用后的人工质量评分。",
+    "本地规则适合中文常见提示词；非常专业的行业任务可通过 LLM 增强模式提升语义理解。",
+    "Baseline 没有调用外部模型，是朴素提示方式的结构化评分基线，优势主要反映任务工程与上下文组织收益。"
+  ]
+}

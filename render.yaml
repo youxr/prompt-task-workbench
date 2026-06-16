@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: prompt-workbench-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: PORT
+        value: 8787
+      - key: AUTH_DATA_FILE
+        value: /opt/render/project/src/data/app-data.json
+      - key: PUBLIC_ORIGIN
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_BASE_URL
+        value: https://api.openai.com/v1
+      - key: AI_MODEL
+        value: gpt-4.1-mini
