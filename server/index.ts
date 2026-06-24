@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { analyzePrompt } from "../src/lib/analyzer";
 import type { AnalysisResult, PromptAnalysisOptions } from "../src/lib/types";
 import { AuthError, AuthStore, type PublicUser } from "./authStore";
+import { handleFeishuAgentCommand } from "./feishuAgent";
 
 const app = express();
 const port = Number(process.env.PORT || 8787);
@@ -114,6 +115,61 @@ app.get("/api/admin/analysis-logs", async (request, response) => {
   const user = await requireAdmin(request, response);
   if (!user) return;
   response.json({ logs: await authStore.listAnalysisLogs() });
+});
+
+app.post("/api/feishu/command", async (request, response) => {
+  if (!isValidFeishuAgentSecret(request)) {
+    response.status(401).json({ ok: false, message: "Invalid feishu agent secret" });
+    return;
+  }
+
+  try {
+    const result = await handleFeishuAgentCommand(
+      {
+        text: String(request.body?.text || request.body?.message || ""),
+        operatorOpenId: typeof request.body?.operatorOpenId === "string" ? request.body.operatorOpenId : undefined,
+        operatorName: typeof request.body?.operatorName === "string" ? request.body.operatorName : undefined,
+        confirm: request.body?.confirm === true
+      },
+      authStore
+    );
+    response.status(result.ok ? 200 : result.needsConfirmation ? 409 : 400).json(result);
+  } catch (error) {
+    sendError(response, error);
+  }
+});
+
+app.post("/api/feishu/events", async (request, response) => {
+  if (request.body?.type === "url_verification" && typeof request.body?.challenge === "string") {
+    response.json({ challenge: request.body.challenge });
+    return;
+  }
+
+  if (!isValidFeishuVerificationToken(request)) {
+    response.status(401).json({ ok: false, message: "Invalid feishu verification token" });
+    return;
+  }
+
+  const text = extractFeishuEventText(request.body);
+  const operatorOpenId = extractFeishuOpenId(request.body);
+
+  if (!text) {
+    response.json({ ok: true, message: "ignored unsupported feishu event" });
+    return;
+  }
+
+  try {
+    const result = await handleFeishuAgentCommand({ text, operatorOpenId }, authStore);
+    response.json({
+      ok: true,
+      action: result.action,
+      reply: result.reply,
+      data: result.data,
+      note: "已解析飞书事件。正式回复飞书消息需要配置发送消息 API。"
+    });
+  } catch (error) {
+    sendError(response, error);
+  }
 });
 
 app.post("/api/analyze", async (request, response) => {
@@ -284,6 +340,58 @@ function getBearerToken(request: express.Request): string | undefined {
     return undefined;
   }
   return header.slice("Bearer ".length).trim();
+}
+
+function isValidFeishuAgentSecret(request: express.Request): boolean {
+  const expected = process.env.FEISHU_AGENT_SECRET;
+  if (!expected) {
+    return true;
+  }
+
+  return request.header("x-feishu-agent-secret") === expected;
+}
+
+function isValidFeishuVerificationToken(request: express.Request): boolean {
+  const expected = process.env.FEISHU_VERIFICATION_TOKEN;
+  if (!expected) {
+    return true;
+  }
+
+  return request.body?.token === expected || request.header("x-feishu-verification-token") === expected;
+}
+
+function extractFeishuEventText(payload: unknown): string {
+  const body = payload as {
+    event?: {
+      message?: {
+        content?: string;
+      };
+    };
+  };
+  const content = body.event?.message?.content;
+  if (!content) {
+    return "";
+  }
+
+  try {
+    const parsed = JSON.parse(content) as { text?: string };
+    return parsed.text || "";
+  } catch {
+    return content;
+  }
+}
+
+function extractFeishuOpenId(payload: unknown): string | undefined {
+  const body = payload as {
+    event?: {
+      sender?: {
+        sender_id?: {
+          open_id?: string;
+        };
+      };
+    };
+  };
+  return body.event?.sender?.sender_id?.open_id;
 }
 
 function sendError(response: express.Response, error: unknown): void {
