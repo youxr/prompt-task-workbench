@@ -14,7 +14,7 @@ POST /api/feishu/command
 POST /api/feishu/events
 ```
 
-当前 `/api/feishu/events` 已支持飞书 URL verification 和基础消息解析；真正“主动回复飞书消息”还需要继续配置飞书发送消息 API。
+当前 `/api/feishu/events` 已支持飞书 URL verification、基础消息解析和自动回复飞书消息。自动回复需要配置飞书应用的 `App ID` 与 `App Secret`。
 
 ## 环境变量
 
@@ -22,6 +22,8 @@ POST /api/feishu/events
 
 ```env
 FEISHU_AGENT_SECRET=change-me
+FEISHU_APP_ID=cli_xxx
+FEISHU_APP_SECRET=xxx
 FEISHU_ADMIN_OPEN_IDS=ou_xxx,ou_yyy
 FEISHU_VERIFICATION_TOKEN=xxx
 PUBLIC_APP_URL=http://101.132.44.51
@@ -30,6 +32,7 @@ PUBLIC_APP_URL=http://101.132.44.51
 说明：
 
 - `FEISHU_AGENT_SECRET`：调用 `/api/feishu/command` 时要放在请求头 `x-feishu-agent-secret`。
+- `FEISHU_APP_ID` / `FEISHU_APP_SECRET`：用于获取飞书 `tenant_access_token` 并回复消息。
 - `FEISHU_ADMIN_OPEN_IDS`：允许使用管理智能体的飞书用户 open_id。留空则不限制，开发期可留空，生产建议配置。
 - `FEISHU_VERIFICATION_TOKEN`：飞书事件订阅的 verification token。
 - `PUBLIC_APP_URL`：机器人回复里给用户的网页访问地址。
@@ -129,10 +132,36 @@ x-feishu-agent-secret: 你的 FEISHU_AGENT_SECRET
 }
 ```
 
-第二阶段再接：
+## 飞书事件订阅配置
 
-- 飞书事件订阅 `im.message.receive_v1`
-- `/api/feishu/events`
-- 飞书发送消息 API，把 `reply` 主动发回聊天窗口
+在飞书开放平台创建企业自建应用后：
 
-这样可以先让“自然语言控制网页后端”跑起来，再逐步补完整飞书交互体验。
+1. 开启机器人能力。
+2. 给应用添加消息相关权限，例如接收消息事件、发送/回复消息。
+3. 在事件订阅里选择“发送至开发者服务器”。
+4. 请求地址填：
+
+```text
+http://你的服务器/api/feishu/events
+```
+
+如果你配置了域名和 HTTPS，推荐使用 HTTPS：
+
+```text
+https://你的域名/api/feishu/events
+```
+
+5. 订阅消息事件：
+
+```text
+im.message.receive_v1
+```
+
+收到飞书消息后，后端会：
+
+- 解析消息文本
+- 执行自然语言管理指令
+- 获取 `tenant_access_token`
+- 调用飞书回复消息 API，把 `reply` 发回聊天窗口
+
+如果 `FEISHU_APP_ID` 或 `FEISHU_APP_SECRET` 未配置，接口仍会解析指令并返回 JSON，但不会主动回复飞书消息；响应里的 `feishuReply.sent` 会是 `false`。

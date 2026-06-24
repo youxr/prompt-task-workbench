@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { analyzePrompt } from "../src/lib/analyzer";
 import type { AnalysisResult, PromptAnalysisOptions } from "../src/lib/types";
 import { AuthError, AuthStore, type PublicUser } from "./authStore";
+import { replyToFeishuMessage } from "./feishuClient";
 import { handleFeishuAgentCommand } from "./feishuAgent";
 
 const app = express();
@@ -152,6 +153,7 @@ app.post("/api/feishu/events", async (request, response) => {
 
   const text = extractFeishuEventText(request.body);
   const operatorOpenId = extractFeishuOpenId(request.body);
+  const messageId = extractFeishuMessageId(request.body);
 
   if (!text) {
     response.json({ ok: true, message: "ignored unsupported feishu event" });
@@ -160,12 +162,15 @@ app.post("/api/feishu/events", async (request, response) => {
 
   try {
     const result = await handleFeishuAgentCommand({ text, operatorOpenId }, authStore);
+    const feishuReply = messageId
+      ? await replyToFeishuMessage(messageId, result.reply)
+      : { sent: false, reason: "Missing message_id" };
     response.json({
       ok: true,
       action: result.action,
       reply: result.reply,
       data: result.data,
-      note: "已解析飞书事件。正式回复飞书消息需要配置发送消息 API。"
+      feishuReply
     });
   } catch (error) {
     sendError(response, error);
@@ -392,6 +397,17 @@ function extractFeishuOpenId(payload: unknown): string | undefined {
     };
   };
   return body.event?.sender?.sender_id?.open_id;
+}
+
+function extractFeishuMessageId(payload: unknown): string | undefined {
+  const body = payload as {
+    event?: {
+      message?: {
+        message_id?: string;
+      };
+    };
+  };
+  return body.event?.message?.message_id;
 }
 
 function sendError(response: express.Response, error: unknown): void {
